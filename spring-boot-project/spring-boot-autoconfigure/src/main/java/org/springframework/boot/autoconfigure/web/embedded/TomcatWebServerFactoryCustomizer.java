@@ -160,11 +160,11 @@ public class TomcatWebServerFactoryCustomizer
 	}
 
 	private void customizeRelaxedPathChars(ConfigurableTomcatWebServerFactory factory, String relaxedChars) {
-		factory.addConnectorCustomizers((connector) -> connector.setAttribute("relaxedPathChars", relaxedChars));
+		factory.addConnectorCustomizers((connector) -> connector.setProperty("relaxedPathChars", relaxedChars));
 	}
 
 	private void customizeRelaxedQueryChars(ConfigurableTomcatWebServerFactory factory, String relaxedChars) {
-		factory.addConnectorCustomizers((connector) -> connector.setAttribute("relaxedQueryChars", relaxedChars));
+		factory.addConnectorCustomizers((connector) -> connector.setProperty("relaxedQueryChars", relaxedChars));
 	}
 
 	private String joinCharacters(List<Character> content) {
@@ -183,8 +183,7 @@ public class TomcatWebServerFactoryCustomizer
 			if (StringUtils.hasLength(remoteIpHeader)) {
 				valve.setRemoteIpHeader(remoteIpHeader);
 			}
-			// The internal proxies default to a white list of "safe" internal IP
-			// addresses
+			// The internal proxies default to a list of "safe" internal IP addresses
 			valve.setInternalProxies(remoteIpProperties.getInternalProxies());
 			try {
 				valve.setHostHeader(remoteIpProperties.getHostHeader());

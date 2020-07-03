@@ -711,6 +711,15 @@ class ConfigFileApplicationListenerTests {
 	}
 
 	@Test
+	void classpathWildcardResourceThrowsException() {
+		TestPropertySourceUtils.addInlinedPropertiesToEnvironment(this.environment,
+				"spring.config.location=classpath*:override.properties");
+		assertThatIllegalStateException()
+				.isThrownBy(() -> this.initializer.postProcessEnvironment(this.environment, this.application))
+				.withMessage("Classpath wildcard patterns cannot be used as a search location");
+	}
+
+	@Test
 	void propertySourceAnnotation() {
 		SpringApplication application = new SpringApplication(WithPropertySource.class);
 		application.setWebApplicationType(WebApplicationType.NONE);
@@ -1016,7 +1025,7 @@ class ConfigFileApplicationListenerTests {
 	}
 
 	@Test
-	void whenConfigLocationSpecifiesFolderConfigFileProcessingContinues() {
+	void whenConfigLocationSpecifiesDirectoryConfigFileProcessingContinues() {
 		String location = "classpath:application.unknown/";
 		TestPropertySourceUtils.addInlinedPropertiesToEnvironment(this.environment,
 				"spring.config.location=" + location);
@@ -1024,7 +1033,55 @@ class ConfigFileApplicationListenerTests {
 	}
 
 	@Test
-	void locationsWithWildcardFoldersShouldLoadAllFilesThatMatch() {
+	void directoryLocationsWithWildcardShouldHaveWildcardAsLastCharacterBeforeSlash() {
+		String location = "file:src/test/resources/*/config/";
+		TestPropertySourceUtils.addInlinedPropertiesToEnvironment(this.environment,
+				"spring.config.location=" + location);
+		assertThatIllegalStateException()
+				.isThrownBy(() -> this.initializer.postProcessEnvironment(this.environment, this.application))
+				.withMessageStartingWith("Search location '").withMessageEndingWith("' must end with '*/'");
+	}
+
+	@Test
+	void configNameCannotContainWildcard() {
+		TestPropertySourceUtils.addInlinedPropertiesToEnvironment(this.environment,
+				"spring.config.location=file:src/test/resources/", "spring.config.name=*/application");
+		assertThatIllegalStateException()
+				.isThrownBy(() -> this.initializer.postProcessEnvironment(this.environment, this.application))
+				.withMessage("Config name '*/application' cannot contain wildcards");
+	}
+
+	@Test
+	void configNameCanContainSlash() {
+		// Spring Cloud config server depends on this
+		TestPropertySourceUtils.addInlinedPropertiesToEnvironment(this.environment,
+				"spring.config.location=file:src/test/resources/", "spring.config.name=config/application");
+		this.initializer.postProcessEnvironment(this.environment, this.application);
+	}
+
+	@Test
+	void directoryLocationsWithMultipleWildcardsShouldThrowException() {
+		String location = "file:src/test/resources/config/**/";
+		TestPropertySourceUtils.addInlinedPropertiesToEnvironment(this.environment,
+				"spring.config.location=" + location);
+		assertThatIllegalStateException()
+				.isThrownBy(() -> this.initializer.postProcessEnvironment(this.environment, this.application))
+				.withMessageStartingWith("Search location '")
+				.withMessageEndingWith("' cannot contain multiple wildcards");
+	}
+
+	@Test
+	void locationsWithWildcardDirectoriesShouldRestrictToOneLevelDeep() {
+		String location = "file:src/test/resources/config/*/";
+		TestPropertySourceUtils.addInlinedPropertiesToEnvironment(this.environment,
+				"spring.config.location=" + location);
+		this.initializer.setSearchNames("testproperties");
+		this.initializer.postProcessEnvironment(this.environment, this.application);
+		assertThat(this.environment.getProperty("third.property")).isNull();
+	}
+
+	@Test
+	void locationsWithWildcardDirectoriesShouldLoadAllFilesThatMatch() {
 		String location = "file:src/test/resources/config/*/";
 		TestPropertySourceUtils.addInlinedPropertiesToEnvironment(this.environment,
 				"spring.config.location=" + location);
@@ -1034,6 +1091,24 @@ class ConfigFileApplicationListenerTests {
 		String second = this.environment.getProperty("second.property");
 		assertThat(first).isEqualTo("apple");
 		assertThat(second).isEqualTo("ball");
+	}
+
+	@Test
+	void locationsWithWildcardDirectoriesShouldSortAlphabeticallyBasedOnAbsolutePath() {
+		String location = "file:src/test/resources/config/*/";
+		TestPropertySourceUtils.addInlinedPropertiesToEnvironment(this.environment,
+				"spring.config.location=" + location);
+		this.initializer.setSearchNames("testproperties");
+		this.initializer.postProcessEnvironment(this.environment, this.application);
+		List<String> sources = this.environment.getPropertySources().stream()
+				.filter((source) -> source.getName().contains("applicationConfig")).map((source) -> {
+					String name = source.getName();
+					name = name.substring(name.indexOf("src/test/resources"));
+					name = name.substring(0, name.length() - 1);
+					return name;
+				}).collect(Collectors.toList());
+		assertThat(sources).containsExactly("src/test/resources/config/1-first/testproperties.properties",
+				"src/test/resources/config/2-second/testproperties.properties");
 	}
 
 	@Test

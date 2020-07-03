@@ -78,8 +78,6 @@ import org.springframework.web.context.support.GenericWebApplicationContext;
  */
 public class SpringBootContextLoader extends AbstractContextLoader {
 
-	private static final String[] NO_ARGS = new String[0];
-
 	@Override
 	public ApplicationContext loadContext(MergedContextConfiguration config) throws Exception {
 		Class<?>[] configClasses = config.getClasses();
@@ -97,7 +95,7 @@ public class SpringBootContextLoader extends AbstractContextLoader {
 			setActiveProfiles(environment, config.getActiveProfiles());
 		}
 		ResourceLoader resourceLoader = (application.getResourceLoader() != null) ? application.getResourceLoader()
-				: new DefaultResourceLoader(getClass().getClassLoader());
+				: new DefaultResourceLoader(null);
 		TestPropertySourceUtils.addPropertiesFilesToEnvironment(environment, resourceLoader,
 				config.getPropertySourceLocations());
 		TestPropertySourceUtils.addInlinedPropertiesToEnvironment(environment, getInlinedProperties(config));
@@ -145,14 +143,17 @@ public class SpringBootContextLoader extends AbstractContextLoader {
 	 * empty array.
 	 * @param config the source context configuration
 	 * @return the application arguments to use
+	 * @deprecated since 2.2.7
 	 * @see SpringApplication#run(String...)
 	 */
+	@Deprecated
 	protected String[] getArgs(MergedContextConfiguration config) {
-		return MergedAnnotations.from(config.getTestClass(), SearchStrategy.TYPE_HIERARCHY).get(SpringBootTest.class)
-				.getValue("args", String[].class).orElse(NO_ARGS);
+		return SpringBootTestArgs.get(config.getContextCustomizers());
 	}
 
 	private void setActiveProfiles(ConfigurableEnvironment environment, String[] profiles) {
+		environment.setActiveProfiles(profiles);
+		// Also add as properties to override any application.properties
 		String[] pairs = new String[profiles.length];
 		for (int i = 0; i < profiles.length; i++) {
 			pairs[i] = "spring.profiles.active[" + i + "]=" + profiles[i];

@@ -68,9 +68,9 @@ class LifecycleTests {
 
 	private DockerApi docker;
 
-	private Map<String, ContainerConfig> configs = new LinkedHashMap<>();
+	private final Map<String, ContainerConfig> configs = new LinkedHashMap<>();
 
-	private Map<String, ContainerContent> content = new LinkedHashMap<>();
+	private final Map<String, ContainerContent> content = new LinkedHashMap<>();
 
 	@BeforeEach
 	void setup() {
@@ -84,11 +84,7 @@ class LifecycleTests {
 		given(this.docker.container().create(any(), any())).willAnswer(answerWithGeneratedContainerId());
 		given(this.docker.container().wait(any())).willReturn(ContainerStatus.of(0, null));
 		createLifecycle().execute();
-		assertPhaseWasRun("detector", withExpectedConfig("lifecycle-detector.json"));
-		assertPhaseWasRun("analyzer", withExpectedConfig("lifecycle-analyzer.json"));
-		assertPhaseWasRun("restorer", withExpectedConfig("lifecycle-restorer.json"));
-		assertPhaseWasRun("builder", withExpectedConfig("lifecycle-builder.json"));
-		assertPhaseWasRun("exporter", withExpectedConfig("lifecycle-exporter.json"));
+		assertPhaseWasRun("creator", withExpectedConfig("lifecycle-creator.json"));
 		assertThat(this.out.toString()).contains("Successfully built image 'docker.io/library/my-application:latest'");
 	}
 
@@ -102,7 +98,7 @@ class LifecycleTests {
 	}
 
 	@Test
-	void executeWhenAleadyRunThrowsException() throws Exception {
+	void executeWhenAlreadyRunThrowsException() throws Exception {
 		given(this.docker.container().create(any())).willAnswer(answerWithGeneratedContainerId());
 		given(this.docker.container().create(any(), any())).willAnswer(answerWithGeneratedContainerId());
 		given(this.docker.container().wait(any())).willReturn(ContainerStatus.of(0, null));
@@ -118,7 +114,7 @@ class LifecycleTests {
 		given(this.docker.container().create(any(), any())).willAnswer(answerWithGeneratedContainerId());
 		given(this.docker.container().wait(any())).willReturn(ContainerStatus.of(9, null));
 		assertThatExceptionOfType(BuilderException.class).isThrownBy(() -> createLifecycle().execute())
-				.withMessage("Builder lifecycle 'detector' failed with status code 9");
+				.withMessage("Builder lifecycle 'creator' failed with status code 9");
 	}
 
 	@Test
@@ -128,6 +124,7 @@ class LifecycleTests {
 		given(this.docker.container().wait(any())).willReturn(ContainerStatus.of(0, null));
 		BuildRequest request = getTestRequest().withCleanCache(true);
 		createLifecycle(request).execute();
+		assertPhaseWasRun("creator", withExpectedConfig("lifecycle-creator-clean-cache.json"));
 		VolumeName name = VolumeName.of("pack-cache-b35197ac41ea.build");
 		verify(this.docker.volume()).delete(name, true);
 	}
@@ -153,7 +150,7 @@ class LifecycleTests {
 	private BuildRequest getTestRequest() {
 		TarArchive content = mock(TarArchive.class);
 		ImageReference name = ImageReference.of("my-application");
-		return BuildRequest.of(name, (owner) -> content);
+		return BuildRequest.of(name, (owner) -> content).withRunImage(ImageReference.of("cloudfoundry/run"));
 	}
 
 	private Lifecycle createLifecycle() throws IOException {
@@ -162,8 +159,7 @@ class LifecycleTests {
 
 	private Lifecycle createLifecycle(BuildRequest request) throws IOException {
 		EphemeralBuilder builder = mockEphemeralBuilder();
-		return new TestLifecycle(BuildLog.to(this.out), this.docker, request, ImageReference.of("cloudfoundry/run"),
-				builder);
+		return new TestLifecycle(BuildLog.to(this.out), this.docker, request, builder);
 	}
 
 	private EphemeralBuilder mockEphemeralBuilder() throws IOException {
@@ -211,9 +207,8 @@ class LifecycleTests {
 
 	static class TestLifecycle extends Lifecycle {
 
-		TestLifecycle(BuildLog log, DockerApi docker, BuildRequest request, ImageReference runImageReferece,
-				EphemeralBuilder builder) {
-			super(log, docker, request, runImageReferece, builder);
+		TestLifecycle(BuildLog log, DockerApi docker, BuildRequest request, EphemeralBuilder builder) {
+			super(log, docker, request, builder);
 		}
 
 		@Override

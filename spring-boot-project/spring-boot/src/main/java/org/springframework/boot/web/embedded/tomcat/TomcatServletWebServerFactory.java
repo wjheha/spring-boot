@@ -214,7 +214,6 @@ public class TomcatServletWebServerFactory extends AbstractServletWebServerFacto
 				: ClassUtils.getDefaultClassLoader());
 		resetDefaultLocaleMapping(context);
 		addLocaleMappings(context);
-		context.setUseRelativeRedirects(false);
 		try {
 			context.setCreateUploadTargets(true);
 		}
@@ -301,8 +300,8 @@ public class TomcatServletWebServerFactory extends AbstractServletWebServerFacto
 	protected void customizeConnector(Connector connector) {
 		int port = Math.max(getPort(), 0);
 		connector.setPort(port);
-		if (StringUtils.hasText(this.getServerHeader())) {
-			connector.setAttribute("server", this.getServerHeader());
+		if (StringUtils.hasText(getServerHeader())) {
+			connector.setProperty("server", getServerHeader());
 		}
 		if (connector.getProtocolHandler() instanceof AbstractProtocol) {
 			customizeProtocol((AbstractProtocol<?>) connector.getProtocolHandler());
@@ -435,7 +434,7 @@ public class TomcatServletWebServerFactory extends AbstractServletWebServerFacto
 	 * @return a new {@link TomcatWebServer} instance
 	 */
 	protected TomcatWebServer getTomcatWebServer(Tomcat tomcat) {
-		return new TomcatWebServer(tomcat, getPort() >= 0, getShutdown().getGracePeriod());
+		return new TomcatWebServer(tomcat, getPort() >= 0, getShutdown());
 	}
 
 	@Override

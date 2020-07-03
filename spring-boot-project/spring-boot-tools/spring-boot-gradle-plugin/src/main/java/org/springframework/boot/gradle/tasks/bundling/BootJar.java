@@ -27,10 +27,12 @@ import org.gradle.api.file.FileCollection;
 import org.gradle.api.file.FileCopyDetails;
 import org.gradle.api.file.FileTreeElement;
 import org.gradle.api.internal.file.copy.CopyAction;
+import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.specs.Spec;
 import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.Optional;
+import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.bundling.Jar;
 
 /**
@@ -46,9 +48,9 @@ public class BootJar extends Jar implements BootArchive {
 
 	private static final String LAUNCHER = "org.springframework.boot.loader.JarLauncher";
 
-	private static final String CLASSES_FOLDER = "BOOT-INF/classes/";
+	private static final String CLASSES_DIRECTORY = "BOOT-INF/classes/";
 
-	private static final String LIB_FOLDER = "BOOT-INF/lib/";
+	private static final String LIB_DIRECTORY = "BOOT-INF/lib/";
 
 	private static final String LAYERS_INDEX = "BOOT-INF/layers.idx";
 
@@ -95,16 +97,21 @@ public class BootJar extends Jar implements BootArchive {
 
 	@Override
 	public void copy() {
-		this.support.configureManifest(getManifest(), getMainClassName(), CLASSES_FOLDER, LIB_FOLDER, CLASSPATH_INDEX,
-				(this.layered != null) ? LAYERS_INDEX : null);
+		this.support.configureManifest(getManifest(), getMainClassName(), CLASSES_DIRECTORY, LIB_DIRECTORY,
+				CLASSPATH_INDEX, (this.layered != null) ? LAYERS_INDEX : null);
 		super.copy();
 	}
 
 	@Override
 	protected CopyAction createCopyAction() {
 		if (this.layered != null) {
-			LayerResolver layerResolver = new LayerResolver(getConfigurations(), this.layered, this::isLibrary);
-			String layerToolsLocation = this.layered.isIncludeLayerTools() ? LIB_FOLDER : null;
+			JavaPluginConvention javaPluginConvention = getProject().getConvention()
+					.findPlugin(JavaPluginConvention.class);
+			Iterable<SourceSet> sourceSets = (javaPluginConvention != null) ? javaPluginConvention.getSourceSets()
+					: Collections.emptySet();
+			LayerResolver layerResolver = new LayerResolver(sourceSets, getConfigurations(), this.layered,
+					this::isLibrary);
+			String layerToolsLocation = this.layered.isIncludeLayerTools() ? LIB_DIRECTORY : null;
 			return this.support.createCopyAction(this, layerResolver, layerToolsLocation);
 		}
 		return this.support.createCopyAction(this);
@@ -208,11 +215,13 @@ public class BootJar extends Jar implements BootArchive {
 	}
 
 	@Override
+	@Deprecated
 	public boolean isExcludeDevtools() {
 		return this.support.isExcludeDevtools();
 	}
 
 	@Override
+	@Deprecated
 	public void setExcludeDevtools(boolean excludeDevtools) {
 		this.support.setExcludeDevtools(excludeDevtools);
 	}
@@ -265,7 +274,7 @@ public class BootJar extends Jar implements BootArchive {
 	 */
 	protected boolean isLibrary(FileCopyDetails details) {
 		String path = details.getRelativePath().getPathString();
-		return path.startsWith(LIB_FOLDER);
+		return path.startsWith(LIB_DIRECTORY);
 	}
 
 	private LaunchScriptConfiguration enableLaunchScriptIfNecessary() {

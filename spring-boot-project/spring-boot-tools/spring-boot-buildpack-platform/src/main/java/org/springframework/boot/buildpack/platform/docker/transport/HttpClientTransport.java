@@ -131,19 +131,30 @@ abstract class HttpClientTransport implements HttpTransport {
 			HttpEntity entity = response.getEntity();
 			if (statusCode >= 400 && statusCode <= 500) {
 				Errors errors = (statusCode != 500) ? getErrorsFromResponse(entity) : null;
+				Message message = getMessageFromResponse(entity);
 				throw new DockerEngineException(this.host.toHostString(), request.getURI(), statusCode,
-						statusLine.getReasonPhrase(), errors);
+						statusLine.getReasonPhrase(), errors, message);
 			}
 			return new HttpClientResponse(response);
 		}
 		catch (IOException ex) {
-			throw new DockerEngineException(this.host.toHostString(), request.getURI(), 500, ex.getMessage(), null);
+			throw new DockerConnectionException(this.host.toHostString(), ex);
 		}
 	}
 
 	private Errors getErrorsFromResponse(HttpEntity entity) {
 		try {
 			return SharedObjectMapper.get().readValue(entity.getContent(), Errors.class);
+		}
+		catch (IOException ex) {
+			return null;
+		}
+	}
+
+	private Message getMessageFromResponse(HttpEntity entity) {
+		try {
+			return (entity.getContent() != null)
+					? SharedObjectMapper.get().readValue(entity.getContent(), Message.class) : null;
 		}
 		catch (IOException ex) {
 			return null;

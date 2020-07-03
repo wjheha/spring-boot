@@ -115,6 +115,7 @@ public class JarFile extends java.util.jar.JarFile implements Iterable<java.util
 	 */
 	JarFile(JarFile parent) throws IOException {
 		super(parent.rootFile.getFile());
+		super.close();
 		this.parent = parent;
 		this.rootFile = parent.rootFile;
 		this.pathFromRoot = parent.pathFromRoot;
@@ -146,6 +147,7 @@ public class JarFile extends java.util.jar.JarFile implements Iterable<java.util
 	private JarFile(JarFile parent, RandomAccessDataFile rootFile, String pathFromRoot, RandomAccessData data,
 			JarEntryFilter filter, JarFileType type, Supplier<Manifest> manifestSupplier) throws IOException {
 		super(rootFile.getFile());
+		super.close();
 		this.parent = parent;
 		this.rootFile = rootFile;
 		this.pathFromRoot = pathFromRoot;
@@ -353,7 +355,6 @@ public class JarFile extends java.util.jar.JarFile implements Iterable<java.util
 			return;
 		}
 		this.closed = true;
-		super.close();
 		if (this.type == JarFileType.DIRECT && this.parent == null) {
 			this.rootFile.close();
 		}
@@ -363,6 +364,10 @@ public class JarFile extends java.util.jar.JarFile implements Iterable<java.util
 		if (this.closed) {
 			throw new IllegalStateException("zip file closed");
 		}
+	}
+
+	boolean isClosed() {
+		return this.closed;
 	}
 
 	String getUrlString() throws MalformedURLException {

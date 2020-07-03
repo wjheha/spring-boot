@@ -27,8 +27,14 @@ import org.gradle.api.Action;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.attributes.AttributeContainer;
+import org.gradle.api.attributes.Bundling;
+import org.gradle.api.attributes.LibraryElements;
+import org.gradle.api.attributes.Usage;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.internal.artifacts.dsl.LazyPublishArtifact;
+import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.ApplicationPlugin;
 import org.gradle.api.plugins.BasePlugin;
 import org.gradle.api.plugins.JavaPlugin;
@@ -67,6 +73,7 @@ final class JavaPluginAction implements PluginApplicationAction {
 	public void execute(Project project) {
 		disableJarTask(project);
 		configureBuildTask(project);
+		configureDevelopmentOnlyConfiguration(project);
 		TaskProvider<BootJar> bootJar = configureBootJarTask(project);
 		configureBootBuildImageTask(project, bootJar);
 		configureArtifactPublication(bootJar);
@@ -92,7 +99,13 @@ final class JavaPluginAction implements PluginApplicationAction {
 			bootJar.setGroup(BasePlugin.BUILD_GROUP);
 			SourceSet mainSourceSet = javaPluginConvention(project).getSourceSets()
 					.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
-			bootJar.classpath((Callable<FileCollection>) mainSourceSet::getRuntimeClasspath);
+			bootJar.classpath((Callable<FileCollection>) () -> {
+				Configuration developmentOnly = project.getConfigurations()
+						.getByName(SpringBootPlugin.DEVELOPMENT_ONLY_CONFIGURATION_NAME);
+				Configuration productionRuntimeClasspath = project.getConfigurations()
+						.getByName(SpringBootPlugin.PRODUCTION_RUNTIME_CLASSPATH_NAME);
+				return mainSourceSet.getRuntimeClasspath().minus((developmentOnly.minus(productionRuntimeClasspath)));
+			});
 			bootJar.conventionMapping("mainClassName", new MainClassConvention(project, bootJar::getClasspath));
 		});
 	}
@@ -155,6 +168,26 @@ final class JavaPluginAction implements PluginApplicationAction {
 
 	private void configureAdditionalMetadataLocations(JavaCompile compile) {
 		compile.doFirst(new AdditionalMetadataLocationsConfigurer());
+	}
+
+	private void configureDevelopmentOnlyConfiguration(Project project) {
+		Configuration developmentOnly = project.getConfigurations()
+				.create(SpringBootPlugin.DEVELOPMENT_ONLY_CONFIGURATION_NAME);
+		developmentOnly
+				.setDescription("Configuration for development-only dependencies such as Spring Boot's DevTools.");
+		Configuration runtimeClasspath = project.getConfigurations()
+				.getByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME);
+		Configuration productionRuntimeClasspath = project.getConfigurations()
+				.create(SpringBootPlugin.PRODUCTION_RUNTIME_CLASSPATH_NAME);
+		AttributeContainer attributes = productionRuntimeClasspath.getAttributes();
+		ObjectFactory objectFactory = project.getObjects();
+		attributes.attribute(Usage.USAGE_ATTRIBUTE, objectFactory.named(Usage.class, Usage.JAVA_RUNTIME));
+		attributes.attribute(Bundling.BUNDLING_ATTRIBUTE, objectFactory.named(Bundling.class, Bundling.EXTERNAL));
+		attributes.attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
+				objectFactory.named(LibraryElements.class, LibraryElements.JAR));
+		productionRuntimeClasspath.setVisible(false);
+		productionRuntimeClasspath.setExtendsFrom(runtimeClasspath.getExtendsFrom());
+		runtimeClasspath.extendsFrom(developmentOnly);
 	}
 
 	/**

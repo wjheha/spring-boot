@@ -113,7 +113,7 @@ class AsciidoctorConventions {
 	private UnzipDocumentationResources createUnzipDocumentationResourcesTask(Project project) {
 		Configuration documentationResources = project.getConfigurations().maybeCreate("documentationResources");
 		documentationResources.getDependencies()
-				.add(project.getDependencies().create("io.spring.docresources:spring-doc-resources:0.2.1.RELEASE"));
+				.add(project.getDependencies().create("io.spring.docresources:spring-doc-resources:0.2.2.RELEASE"));
 		UnzipDocumentationResources unzipResources = project.getTasks().create("unzipDocumentationResources",
 				UnzipDocumentationResources.class);
 		unzipResources.setResources(documentationResources);
@@ -138,6 +138,7 @@ class AsciidoctorConventions {
 
 	private void configureHtmlOnlyAttributes(AbstractAsciidoctorTask asciidoctorTask) {
 		Map<String, Object> attributes = new HashMap<>();
+		attributes.put("source-highlighter", "highlightjs");
 		attributes.put("highlightjsdir", "js/highlight");
 		attributes.put("highlightjs-theme", "github");
 		attributes.put("linkcss", true);
@@ -151,7 +152,7 @@ class AsciidoctorConventions {
 		attributes.put("attribute-missing", "warn");
 		attributes.put("github-tag", determineGitHubTag(project));
 		attributes.put("spring-boot-artifactory-repo", ArtifactoryRepository.forProject(project));
-		attributes.put("version", "{gradle-project-version}");
+		attributes.put("revnumber", null);
 		asciidoctorTask.attributes(attributes);
 	}
 
